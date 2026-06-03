@@ -1,0 +1,12 @@
+{
+  "name": "mobile-proxy",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "unblocker": "^2.0.1"
+  }
+}
