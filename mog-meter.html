@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOG-METER — Facial Harmony Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --bg:          #07080f;
+    --bg-2:        #0c0e1a;
+    --bg-card:     #0f1120;
+    --gold:        #c9a84c;
+    --gold-light:  #e8c96d;
+    --gold-dim:    #8a6f2e;
+    --white:       #f0ecdf;
+    --silver:      #8a93a8;
+    --border:      rgba(201,168,76,0.15);
+    --border-hi:   rgba(201,168,76,0.55);
+    --red:         #ff5b5b;
+    --green:       #3dffaa;
+  }
+
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle background grid */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(201,168,76,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(201,168,76,0.025) 1px, transparent 1px);
+    background-size: 64px 64px;
+    pointer-events:none; z-index:0;
+  }
+
+  /* Radial glow in center */
+  body::after {
+    content:'';
+    position:fixed;
+    top:0; left:50%; transform:translateX(-50%);
+    width:900px; height:500px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.06) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position:relative; z-index:10;
+    border-bottom:1px solid var(--border);
+    padding:18px 48px;
+    display:flex; align-items:center; justify-content:space-between;
+    background:rgba(7,8,15,0.8);
+    backdrop-filter:blur(12px);
+  }
+
+  .logo-block { display:flex; flex-direction:column; gap:4px; }
+
+  .logo {
+    font-family:'Cinzel', serif;
+    font-weight:900;
+    font-size:1.65rem;
+    letter-spacing:0.35em;
+    color:var(--gold);
+    text-transform:uppercase;
+    text-shadow:0 0 30px rgba(201,168,76,0.3);
+  }
+
+  .logo-sub {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.58rem;
+    letter-spacing:0.45em;
+    color:var(--silver);
+    text-transform:uppercase;
+    opacity:0.6;
+  }
+
+  .header-right { display:flex; align-items:center; gap:16px; }
+
+  .status-dot { width:7px; height:7px; border-radius:50%; background:var(--gold); }
+  .status-dot.active { animation:blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  .status-label {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.62rem;
+    letter-spacing:0.25em;
+    color:var(--gold);
+    display:flex; align-items:center; gap:8px;
+    border:1px solid var(--border-hi);
+    padding:7px 16px;
+    background:rgba(201,168,76,0.04);
+  }
+
+  /* ── MAIN GRID ── */
+  main {
+    position:relative; z-index:1;
+    max-width:1140px;
+    margin:0 auto;
+    padding:40px 32px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:36px;
+    align-items:start;
+  }
+
+  /* ── LEFT COLUMN ── */
+  .left-col { display:flex; flex-direction:column; gap:16px; }
+
+  .section-tag {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.6rem;
+    letter-spacing:0.35em;
+    color:var(--gold);
+    text-transform:uppercase;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section-tag::before {
+    content:'';
+    display:inline-block;
+    width:6px; height:6px;
+    background:var(--gold); border-radius:50%;
+    animation:blink 2s infinite;
+  }
+  .section-tag.static::before { animation:none; }
+
+  /* ── CAMERA FRAME ── */
+  .camera-wrap {
+    position:relative;
+    aspect-ratio:4/3;
+    background:#000;
+    border:1px solid var(--border);
+    overflow:hidden;
+  }
+
+  /* Corner brackets */
+  .camera-wrap::before,
+  .camera-wrap::after,
+  .corner-tr, .corner-bl {
+    content:'';
+    position:absolute;
+    width:22px; height:22px;
+    border-color:var(--gold);
+    border-style:solid;
+    z-index:12;
+  }
+  .camera-wrap::before { top:12px; left:12px; border-width:2px 0 0 2px; }
+  .camera-wrap::after  { bottom:12px; right:12px; border-width:0 2px 2px 0; }
+  .corner-tr { top:12px; right:12px; border-width:2px 2px 0 0; }
+  .corner-bl { bottom:12px; left:12px; border-width:0 0 2px 2px; }
+
+  /* Crosshair */
+  .xhair {
+    position:absolute; inset:0; z-index:6; pointer-events:none;
+  }
+  .xhair-h {
+    position:absolute; top:50%; left:8%; right:8%; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(201,168,76,0.25),transparent);
+  }
+  .xhair-v {
+    position:absolute; left:50%; top:8%; bottom:8%; width:1px;
+    background:linear-gradient(180deg,transparent,rgba(201,168,76,0.25),transparent);
+  }
+
+  /* Face oval guide */
+  .face-oval {
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-52%);
+    width:40%; aspect-ratio:3/4;
+    border:1px dashed rgba(201,168,76,0.18);
+    border-radius:50%;
+    z-index:6; pointer-events:none;
+  }
+
+  /* Scan line */
+  .scan-line {
+    position:absolute; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+    box-shadow:0 0 12px rgba(201,168,76,0.8), 0 0 30px rgba(201,168,76,0.3);
+    z-index:9; opacity:0; transition:opacity 0.3s;
+    top:0;
+  }
+  .scanning .scan-line {
+    opacity:1;
+    animation:scanDown 1.4s linear infinite;
+  }
+  @keyframes scanDown {
+    0%  { top:-2px; }
+    100%{ top:100%; }
+  }
+
+  video, canvas#snap {
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+    transform:scaleX(-1);
+  }
+  canvas#snap { display:none; }
+
+  /* Camera HUD */
+  .cam-hud {
+    position:absolute; bottom:10px; left:14px; right:14px;
+    display:flex; justify-content:space-between;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.58rem; letter-spacing:0.12em;
+    color:rgba(201,168,76,0.45);
+    z-index:12; pointer-events:none;
+  }
+
+  /* Loading overlay */
+  .loading-overlay {
+    position:absolute; inset:0;
+    background:rgba(7,8,15,0.88);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    z-index:20; gap:14px;
+    opacity:0; pointer-events:none;
+    transition:opacity 0.3s;
+  }
+  .loading-overlay.on { opacity:1; pointer-events:all; }
+
+  .spinner {
+    width:36px; height:36px;
+    border:1.5px solid rgba(201,168,76,0.2);
+    border-top-color:var(--gold);
+    border-radius:50%;
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .loading-msg {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.62rem; letter-spacing:0.28em;
+    color:var(--gold);
+  }
+
+  /* ── ANALYZE BUTTON ── */
+  .btn-primary {
+    width:100%;
+    padding:15px 24px;
+    background:linear-gradient(135deg, var(--gold-dim), var(--gold), var(--gold-dim));
+    border:none; cursor:pointer;
+    font-family:'Cinzel', serif;
+    font-size:0.78rem;
+    font-weight:700;
+    letter-spacing:0.4em;
+    text-transform:uppercase;
+    color:#000;
+    transition:all 0.3s;
+    position:relative; overflow:hidden;
+  }
+  .btn-primary::before {
+    content:'';
+    position:absolute; top:0; left:-100%; width:100%; height:100%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.28),transparent);
+    transition:left 0.5s;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background:linear-gradient(135deg, var(--gold), var(--gold-light), var(--gold));
+    box-shadow:0 0 36px rgba(201,168,76,0.28);
+  }
+  .btn-primary:hover:not(:disabled)::before { left:100%; }
+  .btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
+
+  .btn-secondary {
+    width:100%;
+    padding:13px 24px;
+    background:transparent;
+    border:1px solid var(--border-hi); cursor:pointer;
+    font-family:'Cinzel', serif;
+    font-size:0.75rem;
+    font-weight:600;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    color:var(--gold);
+    transition:all 0.3s;
+  }
+  .btn-secondary:hover { background:rgba(201,168,76,0.06); }
+
+  /* ── ERROR ── */
+  .error-box {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.68rem;
+    color:var(--red);
+    border:1px solid rgba(255,91,91,0.3);
+    background:rgba(255,91,91,0.05);
+    padding:12px 16px;
+    display:none;
+    letter-spacing:0.1em;
+  }
+
+  /* ── RIGHT COLUMN ── */
+  .right-col { display:flex; flex-direction:column; gap:16px; }
+
+  /* Placeholder */
+  .placeholder {
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    padding:60px 32px;
+    text-align:center;
+    display:flex; flex-direction:column;
+    align-items:center; gap:20px;
+  }
+  .placeholder-icon {
+    width:56px; height:56px;
+    border:1px solid rgba(201,168,76,0.25);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(201,168,76,0.35);
+  }
+  .placeholder-text {
+    font-size:0.82rem; color:var(--silver);
+    opacity:0.5; line-height:1.75;
+  }
+
+  /* Score card */
+  .score-card {
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    padding:32px;
+    text-align:center;
+    position:relative; overflow:hidden;
+  }
+  .score-card::after {
+    content:'';
+    position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.06), transparent 65%);
+    pointer-events:none;
+  }
+
+  .card-tag {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.58rem;
+    letter-spacing:0.38em;
+    color:var(--silver);
+    text-transform:uppercase;
+    margin-bottom:24px;
+    opacity:0.7;
+  }
+
+  /* SVG ring */
+  .ring-wrap {
+    position:relative;
+    width:164px; height:164px;
+    margin:0 auto 22px;
+  }
+  .ring-wrap svg {
+    width:100%; height:100%;
+    transform:rotate(-90deg);
+  }
+  .ring-bg { fill:none; stroke:rgba(255,255,255,0.04); stroke-width:9; }
+  .ring-fill {
+    fill:none;
+    stroke:var(--gold);
+    stroke-width:9;
+    stroke-linecap:round;
+    stroke-dasharray: 451.2;
+    stroke-dashoffset: 451.2;
+    transition:stroke-dashoffset 2.2s cubic-bezier(.22,.68,0,1.2);
+    filter:drop-shadow(0 0 8px rgba(201,168,76,0.6));
+  }
+  .ring-center {
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .ring-score {
+    font-family:'Cinzel', serif;
+    font-weight:900;
+    font-size:2.8rem;
+    color:var(--gold);
+    line-height:1;
+  }
+  .ring-denom {
+    font-family:'Cinzel', serif;
+    font-size:1rem; color:var(--silver); font-weight:400;
+  }
+
+  .score-tier {
+    font-family:'Cinzel', serif;
+    font-size:1.05rem; font-weight:700;
+    letter-spacing:0.22em;
+    color:var(--white);
+    text-transform:uppercase;
+    margin-bottom:5px;
+  }
+  .score-note {
+    font-size:0.78rem; color:var(--silver); font-style:italic; opacity:0.7;
+  }
+
+  /* Metrics grid */
+  .metrics-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .metric {
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    padding:16px;
+  }
+  .metric-name {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.57rem;
+    letter-spacing:0.22em;
+    color:var(--silver);
+    text-transform:uppercase;
+    margin-bottom:10px;
+    opacity:0.7;
+  }
+  .metric-val {
+    font-family:'Cinzel', serif;
+    font-size:1.45rem;
+    font-weight:700;
+    color:var(--gold);
+    line-height:1;
+    margin-bottom:10px;
+  }
+  .metric-bar {
+    height:2px;
+    background:rgba(255,255,255,0.05);
+    position:relative; overflow:hidden;
+  }
+  .metric-fill {
+    position:absolute; left:0; top:0; bottom:0;
+    width:0%;
+    transition:width 1.6s cubic-bezier(.22,.68,0,1.1);
+  }
+
+  /* Commentary */
+  .commentary {
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    padding:22px 24px;
+  }
+  .commentary-head {
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.58rem;
+    letter-spacing:0.32em;
+    color:var(--gold);
+    text-transform:uppercase;
+    margin-bottom:14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .commentary-head::after {
+    content:''; flex:1; height:1px;
+    background:var(--border);
+  }
+  .commentary-text {
+    font-size:0.83rem;
+    color:var(--silver);
+    line-height:1.8;
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(14px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .anim-0 { animation:fadeUp 0.45s ease both; }
+  .anim-1 { animation:fadeUp 0.45s 0.12s ease both; }
+  .anim-2 { animation:fadeUp 0.45s 0.25s ease both; }
+  .anim-3 { animation:fadeUp 0.45s 0.38s ease both; }
+
+  /* Footer */
+  footer {
+    position:relative; z-index:1;
+    border-top:1px solid var(--border);
+    padding:20px 48px;
+    display:flex; align-items:center; justify-content:space-between;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.57rem;
+    letter-spacing:0.2em;
+    color:rgba(138,147,168,0.3);
+  }
+
+  /* Disclaimer band */
+  .disclaimer {
+    position:relative; z-index:1;
+    text-align:center;
+    padding:10px 24px 0;
+    font-size:0.68rem;
+    color:rgba(138,147,168,0.3);
+    font-style:italic;
+  }
+
+  @media (max-width:768px) {
+    main { grid-template-columns:1fr; }
+    header { padding:16px 20px; }
+    footer { flex-direction:column; gap:8px; text-align:center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo-block">
+    <div class="logo">MOG-METER</div>
+    <div class="logo-sub">FACIAL HARMONY ANALYSIS SYSTEM</div>
+  </div>
+  <div class="status-label">
+    <span class="status-dot active" id="statusDot"></span>
+    <span id="statusText">INITIALIZING</span>
+  </div>
+</header>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <!-- LEFT: Camera -->
+  <div class="left-col">
+    <div class="section-tag" id="camTag">LIVE FEED — ALIGN FACE WITH OVAL</div>
+
+    <div class="camera-wrap" id="camWrap">
+      <div class="corner-tr"></div>
+      <div class="corner-bl"></div>
+      <div class="xhair">
+        <div class="xhair-h"></div>
+        <div class="xhair-v"></div>
+      </div>
+      <div class="face-oval"></div>
+      <div class="scan-line"></div>
+      <video id="vid" autoplay playsinline muted></video>
+      <canvas id="snap"></canvas>
+      <div class="cam-hud">
+        <span id="hudRes">RES: --</span>
+        <span id="hudTime">--:--:--</span>
+        <span>INPUT: FRONT CAM</span>
+      </div>
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-msg" id="loadingMsg">CALIBRATING...</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="analyzeBtn" onclick="doAnalyze()" disabled>
+      ▶&nbsp; ANALYZE FACIAL HARMONY
+    </button>
+
+    <div class="error-box" id="errBox"></div>
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="right-col" id="rightCol">
+    <div class="placeholder">
+      <div class="placeholder-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 3.25 1.96 6.05 4.78 7.32L9 21h6l-.78-4.68C17.04 15.05 19 12.25 19 9c0-3.87-3.13-7-7-7z"/>
+          <line x1="12" y1="12" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <div class="placeholder-text">
+        Position your face centrally within the oval guide.<br>
+        Press <strong style="color:var(--gold);font-weight:600;">ANALYZE</strong> to begin your assessment.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="disclaimer">
+  MOG-METER provides an AI-based aesthetic assessment for entertainment purposes only. Attractiveness is subjective and culturally relative.
+</div>
+
+<footer>
+  <span>MOG-METER — FACIAL HARMONY ENGINE v1.0</span>
+  <span>POWERED BY CLAUDE AI · ANTHROPIC</span>
+  <span id="footerTime">--:--:-- UTC</span>
+</footer>
+
+<script>
+// ── GLOBALS ─────────────────────────────────────────────────────
+const vid    = document.getElementById('vid');
+const snap   = document.getElementById('snap');
+const btn    = document.getElementById('analyzeBtn');
+const camWrap= document.getElementById('camWrap');
+const overlay= document.getElementById('loadingOverlay');
+const loadMsg= document.getElementById('loadingMsg');
+const errBox = document.getElementById('errBox');
+const statusDot  = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+
+// ── TIME HUD ────────────────────────────────────────────────────
+function tick() {
+  const n = new Date();
+  const t = [n.getHours(), n.getMinutes(), n.getSeconds()]
+    .map(x => String(x).padStart(2,'0')).join(':');
+  document.getElementById('hudTime').textContent = t;
+  document.getElementById('footerTime').textContent = t + ' UTC';
+}
+setInterval(tick, 1000); tick();
+
+// ── CAMERA ──────────────────────────────────────────────────────
+(async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:'user', width:{ideal:1280}, height:{ideal:960} },
+      audio: false
+    });
+    vid.srcObject = stream;
+    vid.onloadedmetadata = () => {
+      snap.width  = vid.videoWidth;
+      snap.height = vid.videoHeight;
+      document.getElementById('hudRes').textContent =
+        `RES: ${vid.videoWidth}×${vid.videoHeight}`;
+      btn.disabled = false;
+      setStatus('READY', true);
+    };
+  } catch(e) {
+    setStatus('CAM ERROR', false);
+    showError('Camera access denied — please allow camera permissions and reload.');
+  }
+})();
+
+function setStatus(text, active) {
+  statusText.textContent = text;
+  statusDot.className = 'status-dot' + (active ? ' active' : '');
+}
+
+// ── CAPTURE ─────────────────────────────────────────────────────
+async function doAnalyze() {
+  btn.disabled = true;
+  hideError();
+  setStatus('CAPTURING', true);
+
+  // Draw mirrored frame to canvas
+  const ctx = snap.getContext('2d');
+  ctx.save();
+  ctx.translate(snap.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(vid, 0, 0);
+  ctx.restore();
+
+  // Swap video for snapshot
+  vid.style.display  = 'none';
+  snap.style.display = 'block';
+
+  // Activate scan animation
+  camWrap.classList.add('scanning');
+  setStatus('ANALYZING', true);
+  overlay.classList.add('on');
+
+  const msgs = [
+    'MAPPING FACIAL GEOMETRY...',
+    'CALCULATING HARMONY RATIOS...',
+    'ASSESSING CANTHAL TILT...',
+    'MEASURING FACIAL THIRDS...',
+    'SCORING ANGULARITY...',
+    'COMPILING REPORT...'
+  ];
+  let mi = 0;
+  const msgTimer = setInterval(() => { loadMsg.textContent = msgs[mi++ % msgs.length]; }, 1000);
+
+  try {
+    const b64 = snap.toDataURL('image/jpeg', 0.92).split(',')[1];
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1200,
+        messages: [{
+          role:'user',
+          content: [
+            {
+              type:'image',
+              source:{ type:'base64', media_type:'image/jpeg', data:b64 }
+            },
+            {
+              type:'text',
+              text:`You are the scoring engine for MOG-METER, an elite facial harmony analysis system. Analyze the face in this image and return ONLY a valid JSON object — no markdown, no backticks, no preamble, no explanation. Use exactly this schema:
+
+{
+  "overall":      <float 1.0–10.0, one decimal>,
+  "tier":         <string: one of "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Apex">,
+  "symmetry":     <float 1.0–10.0>,
+  "harmony":      <float 1.0–10.0>,
+  "angularity":   <float 1.0–10.0>,
+  "canthal_tilt": <float 1.0–10.0>,
+  "thirds":       <float 1.0–10.0>,
+  "skin":         <float 1.0–10.0>,
+  "commentary":   <string, 2–3 sentences, clinical yet engaging, naming specific strongest and weakest features>
+}
+
+Tier guide: 1–3 Bronze, 4–5 Silver, 5.5–6.5 Gold, 6.5–7.5 Platinum, 7.5–8.5 Diamond, 8.5–10 Apex.
+Scale guide: 1–3 below average, 4–5 average, 6–7 above average, 8–9 highly attractive, 10 exceptional.
+
+Metric definitions:
+- symmetry: bilateral facial symmetry
+- harmony: proportional balance across all features
+- angularity: jawline definition, cheekbone projection, overall facial bone structure
+- canthal_tilt: lateral canthus position relative to medial — positive tilt scores higher
+- thirds: vertical facial proportion adherence (hairline-brow / brow-nose tip / nose tip-chin)
+- skin: texture, clarity, and evenness
+
+If no face is detectable, return { "overall": 0, "tier": "N/A", "commentary": "No face detected in frame." }.
+Pure JSON only.`
+            }
+          ]
+        }]
+      })
+    });
+
+    clearInterval(msgTimer);
+
+    const data = await res.json();
+    const raw  = data.content.map(c => c.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+
+    if (result.overall === 0) {
+      showError('No face detected. Please ensure your face is clearly lit and centred in frame.');
+      resetCam();
+    } else {
+      renderResults(result);
+      setStatus('COMPLETE', false);
+    }
+
+  } catch(err) {
+    clearInterval(msgTimer);
+    showError('Analysis failed — ' + (err.message || 'please try again.'));
+    resetCam();
+    setStatus('READY', true);
+  } finally {
+    overlay.classList.remove('on');
+    camWrap.classList.remove('scanning');
+    btn.disabled = false;
+  }
+}
+
+function resetCam() {
+  vid.style.display  = 'block';
+  snap.style.display = 'none';
+}
+
+// ── RENDER RESULTS ───────────────────────────────────────────────
+function renderResults(r) {
+  const circ  = 2 * Math.PI * 72; // r=72 circle
+  const offset = circ - (r.overall / 10) * circ;
+  const col   = scoreColor(r.overall);
+
+  const metrics = [
+    ['SYMMETRY',     r.symmetry],
+    ['HARMONY',      r.harmony],
+    ['ANGULARITY',   r.angularity],
+    ['CANTHAL TILT', r.canthal_tilt],
+    ['FACIAL THIRDS',r.thirds],
+    ['SKIN QUALITY', r.skin],
+  ];
+
+  document.getElementById('rightCol').innerHTML = `
+
+    <!-- Score Card -->
+    <div class="score-card anim-0">
+      <div class="card-tag">COMPOSITE ATTRACTIVENESS SCORE</div>
+      <div class="ring-wrap">
+        <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+          <circle class="ring-bg" cx="80" cy="80" r="72"/>
+          <circle class="ring-fill" id="ringFill" cx="80" cy="80" r="72"
+            style="stroke:${col}; stroke-dasharray:${circ}; stroke-dashoffset:${circ}; filter:drop-shadow(0 0 8px ${col}88);"/>
+        </svg>
+        <div class="ring-center">
+          <div class="ring-score" style="color:${col};">
+            ${r.overall.toFixed(1)}<span class="ring-denom">/10</span>
+          </div>
+        </div>
+      </div>
+      <div class="score-tier" style="color:${col};">${r.tier.toUpperCase()} TIER</div>
+      <div class="score-note">Overall facial harmony assessment</div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics-grid anim-1">
+      ${metrics.map(([name, val]) => {
+        const c = scoreColor(val);
+        return `
+        <div class="metric">
+          <div class="metric-name">${name}</div>
+          <div class="metric-val" style="color:${c};">${val.toFixed(1)}</div>
+          <div class="metric-bar">
+            <div class="metric-fill" data-w="${val*10}"
+              style="background:linear-gradient(90deg,${c}55,${c}); width:0%;"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Commentary -->
+    <div class="commentary anim-2">
+      <div class="commentary-head">ANALYSIS REPORT</div>
+      <div class="commentary-text">${r.commentary}</div>
+    </div>
+
+    <!-- Retake -->
+    <button class="btn-secondary anim-3" onclick="retake()">
+      ↺ &nbsp; NEW ANALYSIS
+    </button>
+  `;
+
+  // Animate ring
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      const fill = document.getElementById('ringFill');
+      if (fill) fill.style.strokeDashoffset = offset;
+    }, 80);
+  });
+
+  // Animate metric bars
+  setTimeout(() => {
+    document.querySelectorAll('.metric-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }, 400);
+}
+
+function retake() {
+  resetCam();
+  setStatus('READY', true);
+  document.getElementById('rightCol').innerHTML = `
+    <div class="placeholder">
+      <div class="placeholder-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 3.25 1.96 6.05 4.78 7.32L9 21h6l-.78-4.68C17.04 15.05 19 12.25 19 9c0-3.87-3.13-7-7-7z"/>
+          <line x1="12" y1="12" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <div class="placeholder-text">
+        Position your face centrally within the oval guide.<br>
+        Press <strong style="color:var(--gold);font-weight:600;">ANALYZE</strong> to begin your assessment.
+      </div>
+    </div>`;
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function scoreColor(v) {
+  if (v >= 8)   return '#3dffaa';
+  if (v >= 6.5) return '#c9a84c';
+  if (v >= 5)   return '#e8a030';
+  return '#ff7070';
+}
+
+function showError(msg) {
+  errBox.textContent = '⚠  ' + msg;
+  errBox.style.display = 'block';
+}
+function hideError() {
+  errBox.style.display = 'none';
+}
+</script>
+</body>
+</html>
